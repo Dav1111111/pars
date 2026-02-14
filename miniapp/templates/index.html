@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Поиск запчастей</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --tg-theme-bg-color: #ffffff;
+            --tg-theme-text-color: #000000;
+            --tg-theme-hint-color: #999999;
+            --tg-theme-link-color: #2481cc;
+            --tg-theme-button-color: #2481cc;
+            --tg-theme-button-text-color: #ffffff;
+            --tg-theme-secondary-bg-color: #f0f0f0;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            padding: 16px;
+            min-height: 100vh;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            color: var(--tg-theme-hint-color);
+            font-size: 14px;
+        }
+        
+        .search-container {
+            margin-bottom: 20px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid var(--tg-theme-secondary-bg-color);
+            border-radius: 12px;
+            font-size: 16px;
+            background: var(--tg-theme-secondary-bg-color);
+            color: var(--tg-theme-text-color);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        
+        .search-input:focus {
+            border-color: var(--tg-theme-button-color);
+        }
+        
+        .search-input::placeholder {
+            color: var(--tg-theme-hint-color);
+        }
+        
+        .buttons-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        
+        .btn:active {
+            opacity: 0.7;
+        }
+        
+        .btn-primary {
+            background: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+        }
+        
+        .btn-secondary {
+            background: var(--tg-theme-secondary-bg-color);
+            color: var(--tg-theme-text-color);
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--tg-theme-hint-color);
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--tg-theme-button-color);
+        }
+        
+        .upload-area.dragover {
+            border-color: var(--tg-theme-button-color);
+            background: rgba(36, 129, 204, 0.1);
+        }
+        
+        .upload-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+        
+        .results-container {
+            margin-top: 20px;
+        }
+        
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .results-count {
+            font-size: 14px;
+            color: var(--tg-theme-hint-color);
+        }
+        
+        .result-card {
+            background: var(--tg-theme-secondary-bg-color);
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 12px;
+        }
+        
+        .result-image {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            object-fit: cover;
+            background: #ddd;
+        }
+        
+        .result-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .result-source {
+            font-size: 12px;
+            color: var(--tg-theme-hint-color);
+            margin-bottom: 4px;
+        }
+        
+        .result-title {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+        
+        .result-price {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--tg-theme-button-color);
+        }
+        
+        .result-actions {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 12px;
+        }
+        
+        .btn-go {
+            padding: 4px 12px;
+            font-size: 13px;
+            border-radius: 6px;
+            line-height: 1.2;
+        }
+        
+        .btn-fav {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 4px;
+            transition: transform 0.2s;
+        }
+
+        .btn-fav:active {
+            transform: scale(1.3);
+        }
+
+        .btn-fav.saved {
+            color: #f5a623;
+        }
+
+        .btn-remove {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px;
+            opacity: 0.5;
+        }
+
+        .btn-remove:active {
+            opacity: 1;
+        }
+
+        .history-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--tg-theme-secondary-bg-color);
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .history-item:active {
+            opacity: 0.7;
+        }
+
+        .history-icon {
+            font-size: 24px;
+            width: 40px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .history-query {
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        .history-date {
+            font-size: 12px;
+            color: var(--tg-theme-hint-color);
+            margin-top: 2px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--tg-theme-hint-color);
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--tg-theme-secondary-bg-color);
+            border-top-color: var(--tg-theme-button-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 16px;
+            background: var(--tg-theme-secondary-bg-color);
+            border-radius: 12px;
+            padding: 4px;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .tab.active {
+            background: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+
+        .sort-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .sort-btn {
+            padding: 6px 14px;
+            border: 1.5px solid var(--tg-theme-hint-color);
+            border-radius: 20px;
+            background: transparent;
+            color: var(--tg-theme-text-color);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sort-btn.active {
+            background: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+            border-color: var(--tg-theme-button-color);
+        }
+
+        .btn-refresh {
+            padding: 4px 12px;
+            border: 1.5px solid var(--tg-theme-hint-color);
+            border-radius: 20px;
+            background: transparent;
+            color: var(--tg-theme-text-color);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-refresh:active {
+            opacity: 0.7;
+        }
+
+        .no-img {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            background: var(--tg-theme-secondary-bg-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            flex-shrink: 0;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--tg-theme-hint-color);
+        }
+        
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔧 Поиск запчастей</h1>
+        <p>Найдём лучшие цены на всех сайтах</p>
+    </div>
+    
+    <div class="tabs">
+        <div class="tab active" data-tab="search">🔍 Поиск</div>
+        <div class="tab" data-tab="history">📋 История</div>
+        <div class="tab" data-tab="favorites">⭐ Избранное</div>
+    </div>
+    
+    <!-- Поиск -->
+    <div id="searchTab">
+        <div class="search-container">
+            <input type="text" class="search-input" id="searchInput" 
+                   placeholder="Артикул, VIN или название...">
+            <div class="buttons-row">
+                <button class="btn btn-primary" onclick="search()">🔍 Найти</button>
+                <button class="btn btn-secondary" onclick="openUpload()">📷 Фото</button>
+            </div>
+        </div>
+        
+        <div class="upload-area hidden" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+            <div class="upload-icon">📷</div>
+            <p>Загрузите фото запчасти или артикула</p>
+            <p style="font-size: 12px; color: var(--tg-theme-hint-color); margin-top: 8px;">
+                Мы распознаем артикул автоматически
+            </p>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" onchange="uploadPhoto(event)">
+        
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Ищем по 10 сайтам...</p>
+        </div>
+
+        <div id="sortBar" class="sort-bar hidden">
+            <span style="font-size:13px;color:var(--tg-theme-hint-color)">Сортировка:</span>
+            <button class="sort-btn active" data-sort="price_asc">Дешевле</button>
+            <button class="sort-btn" data-sort="price_desc">Дороже</button>
+            <button class="sort-btn" data-sort="source">Магазин</button>
+        </div>
+
+        <div id="results" class="results-container"></div>
+    </div>
+    
+    <!-- История -->
+    <div id="historyTab" class="hidden">
+        <div id="historyList"></div>
+    </div>
+    
+    <!-- Избранное -->
+    <div id="favoritesTab" class="hidden">
+        <div id="favoritesList"></div>
+    </div>
+
+    <script>
+        // Telegram WebApp
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            
+            // Применяем тему Telegram
+            document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color || '#ffffff');
+            document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color || '#000000');
+            document.documentElement.style.setProperty('--tg-theme-hint-color', tg.themeParams.hint_color || '#999999');
+            document.documentElement.style.setProperty('--tg-theme-button-color', tg.themeParams.button_color || '#2481cc');
+            document.documentElement.style.setProperty('--tg-theme-button-text-color', tg.themeParams.button_text_color || '#ffffff');
+            document.documentElement.style.setProperty('--tg-theme-secondary-bg-color', tg.themeParams.secondary_bg_color || '#f0f0f0');
+        }
+        
+        const userId = tg?.initDataUnsafe?.user?.id || 0;
+        const API_URL = '';
+        let lastQuery = '';
+        let lastResults = [];
+        let currentSort = 'price_asc';
+        
+        // Tabs
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                const tabName = tab.dataset.tab;
+                document.getElementById('searchTab').classList.toggle('hidden', tabName !== 'search');
+                document.getElementById('historyTab').classList.toggle('hidden', tabName !== 'history');
+                document.getElementById('favoritesTab').classList.toggle('hidden', tabName !== 'favorites');
+                
+                if (tabName === 'history') loadHistory();
+                if (tabName === 'favorites') loadFavorites();
+            });
+        });
+        
+        // Sort buttons
+        document.querySelectorAll('.sort-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentSort = btn.dataset.sort;
+                if (lastQuery) search(currentSort);
+            });
+        });
+
+        // Search
+        async function search(sort, forceRefresh) {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) {
+                tg?.showAlert('Введите артикул или название');
+                return;
+            }
+
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('sortBar').classList.add('hidden');
+
+            try {
+                const response = await fetch(`${API_URL}/api/search`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, user_id: userId, sort_by: sort || currentSort, force_refresh: !!forceRefresh })
+                });
+
+                const data = await response.json();
+                lastQuery = query;
+                lastResults = data.results || [];
+                document.getElementById('sortBar').classList.remove('hidden');
+                renderResults(lastResults);
+            } catch (error) {
+                console.error(error);
+                tg?.showAlert('Ошибка поиска');
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+        
+        // Photo upload
+        function openUpload() {
+            document.getElementById('uploadArea').classList.toggle('hidden');
+        }
+        
+        async function uploadPhoto(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('uploadArea').classList.add('hidden');
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('user_id', userId);
+            
+            try {
+                const response = await fetch(`${API_URL}/api/search/photo`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data.error) {
+                    tg?.showAlert(data.error);
+                } else {
+                    renderResults(data.results || []);
+                }
+            } catch (error) {
+                console.error(error);
+                tg?.showAlert('Ошибка загрузки фото');
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+        
+        // Render results
+        function renderResults(results) {
+            const container = document.getElementById('results');
+
+            if (!results.length) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">🔍</div>
+                        <p>Ничего не найдено</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="results-header">
+                    <span class="results-count">Найдено: ${results.length}</span>
+                    <button class="btn-refresh" onclick="refreshSearch()">🔄 Обновить</button>
+                </div>
+                ${results.map((r, i) => {
+                    const hasImg = r.image_url && r.image_url.length > 5;
+                    const imgHtml = hasImg
+                        ? `<img class="result-image" src="${r.image_url}" onerror="this.outerHTML='<div class=no-img>🔧</div>'">`
+                        : `<div class="no-img">🔧</div>`;
+                    const d = JSON.stringify(r).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+                    return `
+                    <div class="result-card">
+                        ${imgHtml}
+                        <div class="result-info">
+                            <div class="result-source">${r.source}</div>
+                            <div class="result-title">${r.title}</div>
+                            <div class="result-price">${r.price}</div>
+                        </div>
+                        <div class="result-actions">
+                            <button class="btn-fav" onclick='addFavorite(${i})'>☆</button>
+                            <a href="${r.link}" target="_blank" class="btn btn-primary btn-go">→</a>
+                        </div>
+                    </div>`;
+                }).join('')}
+            `;
+        }
+        
+        // History
+        async function loadHistory() {
+            const container = document.getElementById('historyList');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/api/history/${userId}`);
+                const data = await response.json();
+                
+                if (!data.history?.length) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">📋</div>
+                            <p>История пуста</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = `<h3 style="margin-bottom:12px;font-size:16px">📋 Последние запросы</h3>` + data.history.map(h => {
+                    const date = h.timestamp ? new Date(h.timestamp * 1000).toLocaleString('ru-RU', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+                    const q = h.query.replace(/'/g, "\\'");
+                    return `
+                    <div class="history-item" onclick="repeatSearch('${q}')">
+                        <div class="history-icon">🔍</div>
+                        <div>
+                            <div class="history-query">${h.query}</div>
+                            <div class="history-date">${date}</div>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (error) {
+                container.innerHTML = '<div class="empty-state"><p>Ошибка загрузки</p></div>';
+            }
+        }
+        
+        function repeatSearch(query) {
+            document.getElementById('searchInput').value = query;
+            document.querySelector('[data-tab="search"]').click();
+            search();
+        }
+        
+        // Favorites
+        async function loadFavorites() {
+            const container = document.getElementById('favoritesList');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/api/favorites/${userId}`);
+                const data = await response.json();
+                
+                if (!data.favorites?.length) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">⭐</div>
+                            <p>Избранное пусто</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = `<h3 style="margin-bottom:12px;font-size:16px">⭐ Избранное (${data.favorites.length})</h3>` + data.favorites.map(r => {
+                    const hasImg = r.image_url && r.image_url.length > 5;
+                    const imgHtml = hasImg
+                        ? `<img class="result-image" src="${r.image_url}" onerror="this.outerHTML='<div class=no-img>🔧</div>'">`
+                        : `<div class="no-img">🔧</div>`;
+                    const price = r.price_int ? `${r.price_int} ₽` : 'По ссылке';
+                    return `
+                    <div class="result-card">
+                        ${imgHtml}
+                        <div class="result-info">
+                            <div class="result-source">${r.source}</div>
+                            <div class="result-title">${r.title}</div>
+                            <div class="result-price">${price}</div>
+                        </div>
+                        <div class="result-actions">
+                            <button class="btn-remove" onclick="removeFavorite(${r.id})">✖</button>
+                            <a href="${r.link}" target="_blank" class="btn btn-primary btn-go">→</a>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (error) {
+                container.innerHTML = '<div class="empty-state"><p>Ошибка загрузки</p></div>';
+            }
+        }
+        
+        async function addFavorite(index) {
+            const r = lastResults[index];
+            if (!r) return;
+            try {
+                const resp = await fetch(`${API_URL}/api/favorites`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        source: r.source,
+                        title: r.title,
+                        price_int: r.price_int || 0,
+                        link: r.link,
+                        image_url: r.image_url || ''
+                    })
+                });
+                if (resp.ok) {
+                    // Меняем ☆ на ★
+                    const btns = document.querySelectorAll('.btn-fav');
+                    if (btns[index]) {
+                        btns[index].textContent = '★';
+                        btns[index].classList.add('saved');
+                    }
+                    tg?.showAlert('Добавлено в избранное ⭐');
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        async function removeFavorite(favId) {
+            try {
+                const resp = await fetch(`${API_URL}/api/favorites/${favId}`, { method: 'DELETE' });
+                if (resp.ok) {
+                    loadFavorites();
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+        
+        // Refresh search (bypass cache)
+        function refreshSearch() {
+            search(currentSort, true);
+        }
+
+        // Enter key
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') search();
+        });
+    </script>
+</body>
+</html>
