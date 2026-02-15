@@ -109,7 +109,7 @@ async def _do_search(message: Message, query: str):
     await db.add_history(user_id, query)
 
     q_escaped = query.replace("*", "").replace("_", "")
-    await message.answer(f"🔍 Ищу *{q_escaped}* по 15 сайтам...", parse_mode=ParseMode.MARKDOWN)
+    await message.answer(f"🔍 Ищу *{q_escaped}* по 11 сайтам...", parse_mode=ParseMode.MARKDOWN)
 
     # Кэш
     cached = await db.get_cache(query)
