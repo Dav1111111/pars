@@ -194,6 +194,30 @@ async def _human_page(playwright, warmup_url, target_url, scroll=True, browser=N
     return html
 
 
+# Навигационные фразы — точно не товары
+_JUNK_TITLES = {
+    'megaZip', 'megazip', 'о мегазипе', 'отзывы покупателей', 'отзывы',
+    'как подобрать запчасти', 'как самостоятельно подобрать запчасти',
+    'доставка', 'оплата', 'контакты', 'о компании', 'о нас', 'каталог',
+    'главная', 'войти', 'регистрация', 'корзина', 'перейти', 'подробнее',
+    'купить', 'все категории', 'все бренды', 'все товары',
+}
+
+
+def _is_product_title(title: str) -> bool:
+    """Проверяет, является ли title реальным названием товара."""
+    t = title.strip()
+    if len(t) < 8:
+        return False
+    if t.lower() in _JUNK_TITLES:
+        return False
+    # Одно слово без цифр — скорее всего бренд или навигация
+    words = t.split()
+    if len(words) == 1 and not any(c.isdigit() for c in t):
+        return False
+    return True
+
+
 def _result(source, title, price_int, link, image_url=''):
     """Единый формат результата."""
     return {
@@ -359,9 +383,9 @@ async def parse_parterra(session, query):
             # Fallback: парсим HTML если API не вернул данных
             if not results:
                 soup = BeautifulSoup(await page.content(), 'html.parser')
-                for a in soup.select('a[href*="/product/"], a[href*="/catalog/"]')[:20]:
+                for a in soup.select('a[href*="/product/"], a[href*="/catalog/"]')[:40]:
                     title = a.get_text(strip=True)
-                    if len(title) < 5:
+                    if not _is_product_title(title):
                         continue
                     link = a.get('href', '')
                     if link and not link.startswith('http'):
@@ -586,18 +610,9 @@ async def parse_bibinet(session, query):
             await page.goto('https://bibinet.ru/', timeout=20000, wait_until='domcontentloaded')
             await page.wait_for_timeout(random.randint(2000, 3000))
 
-            # Ищем поле поиска и вводим запрос
-            inp = await page.query_selector('input[type="search"], input[type="text"], input[placeholder*="поиск" i], input[placeholder*="артикул" i], input[name*="search" i]')
-            if inp:
-                await inp.click()
-                await page.wait_for_timeout(500)
-                await inp.type(query, delay=random.randint(50, 100))
-                await page.wait_for_timeout(random.randint(1000, 2000))
-                await page.keyboard.press('Enter')
-                await page.wait_for_timeout(random.randint(5000, 8000))
-            else:
-                await page.goto(f'https://bibinet.ru/search?query={quote(query)}', timeout=30000, wait_until='domcontentloaded')
-                await page.wait_for_timeout(random.randint(5000, 8000))
+            # Прямой переход на страницу поиска
+            await page.goto(f'https://bibinet.ru/search?query={quote(query)}', timeout=30000, wait_until='domcontentloaded')
+            await page.wait_for_timeout(random.randint(6000, 10000))
 
             await page.mouse.wheel(0, random.randint(300, 700))
             await page.wait_for_timeout(random.randint(1500, 2500))
@@ -622,9 +637,9 @@ async def parse_bibinet(session, query):
             if not results:
                 soup = BeautifulSoup(await page.content(), 'html.parser')
                 seen = set()
-                for a in soup.select('a[href*="/part/"], a[href*="/product/"], a[href*="/detail/"]')[:20]:
+                for a in soup.select('a[href*="/part/"], a[href*="/product/"], a[href*="/detail/"]')[:40]:
                     title = a.get_text(strip=True)
-                    if len(title) < 8 or title in seen:
+                    if not _is_product_title(title) or title in seen:
                         continue
                     seen.add(title)
                     link = a.get('href', '')
@@ -1414,34 +1429,71 @@ async def parse_megazip(session, query):
                         inp = el
                         break
 
-            if inp:
-                await inp.click()
-                await page.wait_for_timeout(500)
-                await inp.fill(query)
-                await page.wait_for_timeout(2000)
-                await page.keyboard.press('Enter')
-                await page.wait_for_timeout(8000)
+            # Прямой переход на страницу поиска
+            await page.goto(
+                f'https://megazip.ru/zapchasti/search?q={quote(query)}',
+                timeout=30000, wait_until='domcontentloaded',
+            )
+            await page.wait_for_timeout(random.randint(8000, 12000))
+            await page.mouse.wheel(0, random.randint(300, 700))
+            await page.wait_for_timeout(random.randint(2000, 3000))
 
+            # Сначала пробуем перехваченные API-данные
+            for item in api_data:
+                try:
+                    body = json.loads(item['body']) if isinstance(item['body'], str) else item['body']
+                    items_list = []
+                    if isinstance(body, dict):
+                        items_list = body.get('items', []) or body.get('products', []) or body.get('data', []) or body.get('results', [])
+                    elif isinstance(body, list):
+                        items_list = body
+                    for prod in items_list[:20]:
+                        if not isinstance(prod, dict):
+                            continue
+                        title = prod.get('name', '') or prod.get('title', '') or prod.get('description', '')
+                        if not title or not _is_product_title(str(title)):
+                            continue
+                        price = prod.get('price', 0) or prod.get('cost', 0)
+                        if isinstance(price, str):
+                            price = clean_price(price)
+                        plink = prod.get('url', '') or prod.get('link', '')
+                        if plink and not plink.startswith('http'):
+                            plink = 'https://megazip.ru' + plink
+                        img = prod.get('image', '') or prod.get('img', '')
+                        if img and not img.startswith('http'):
+                            img = 'https://megazip.ru' + img
+                        results.append(_result('Megazip', str(title), int(price) if price else 0, plink, img))
+                        if len(results) >= 20:
+                            break
+                except Exception:
+                    pass
+                if len(results) >= 20:
+                    break
+
+            # Fallback: парсим HTML
+            if not results:
                 soup = BeautifulSoup(await page.content(), 'html.parser')
-
                 seen = set()
-                for card in soup.select('[class*="product"], [class*="card"], [class*="item"], [class*="catalog"]')[:20]:
-                    a = card.select_one('a[href]')
-                    if not a:
-                        continue
+                for a in soup.select('a[href*="/zapchasti/"]')[:40]:
                     title = a.get_text(strip=True)
-                    if not title or len(title) < 5 or title in seen:
+                    if not _is_product_title(title) or title in seen:
                         continue
                     seen.add(title)
                     link = a.get('href', '')
                     if link and not link.startswith('http'):
                         link = 'https://megazip.ru' + link
-                    pm = re.search(r'(\d[\d\s]*)\s*₽', card.get_text())
-                    price = clean_price(pm.group(1)) if pm else 0
-                    img_el = card.select_one('img')
+                    parent = a.find_parent('div', class_=True)
+                    price = 0
+                    if parent:
+                        pm = re.search(r'(\d[\d\s]*)\s*₽', parent.get_text())
+                        if pm:
+                            price = clean_price(pm.group(1))
+                    img_el = a.find_parent('div').select_one('img') if a.find_parent('div') else None
                     img = ''
                     if img_el:
                         img = img_el.get('src', '') or img_el.get('data-src', '')
+                        if img and not img.startswith('http'):
+                            img = 'https://megazip.ru' + img
                     results.append(_result('Megazip', title, price, link, img))
                     if len(results) >= 20:
                         break
