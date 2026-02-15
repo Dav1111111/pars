@@ -693,7 +693,7 @@ async def parse_wildberries(_session, query):
     ua = _random_ua()
     dest = _rnd.choice(['-1257786', '-1221148', '-364763', '-446085'])
     url = (
-        'https://search.wb.ru/exactmatch/ru/common/v9/search'
+        'https://search.wb.ru/exactmatch/ru/common/v5/search'
         f'?ab_testing=false&appType=1&curr=rub&dest={dest}&query={encoded}'
         '&resultset=catalog&sort=popular&spp=30&suppressSpellcheck=false'
     )
