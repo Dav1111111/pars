@@ -1380,6 +1380,7 @@ async def parse_megazip(session, query):
     """
     if not PLAYWRIGHT_AVAILABLE:
         return []
+    from urllib.parse import quote
     results = []
     try:
         async with async_playwright() as p:
@@ -1416,18 +1417,6 @@ async def parse_megazip(session, query):
 
             await page.goto('https://megazip.ru/', timeout=20000, wait_until='domcontentloaded')
             await page.wait_for_timeout(3000)
-
-            # Ищем поле поиска
-            inp = None
-            inputs = await page.query_selector_all('input')
-            for el in inputs:
-                visible = await el.is_visible()
-                if visible:
-                    ph = await el.get_attribute('placeholder') or ''
-                    t = await el.get_attribute('type') or 'text'
-                    if t in ('text', 'search') or 'поиск' in ph.lower() or 'search' in ph.lower():
-                        inp = el
-                        break
 
             # Прямой переход на страницу поиска
             await page.goto(
