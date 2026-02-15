@@ -1575,6 +1575,11 @@ async def search_all_sites(query: str) -> list:
                 'Колёса Даром': _pw_limited('КД', parse_kolesa_darom, session, clean_q),
                 'Armtek': _pw_limited('Armtek', parse_armtek, session, clean_q),
                 'Exist': _pw_limited('Exist', parse_exist, session, clean_q),
+                'Parterra': _pw_limited('Parterra', parse_parterra, session, clean_q),
+                'Autopiter': _pw_limited('Autopiter', parse_autopiter, session, clean_q),
+                'Bibinet': _pw_limited('Bibinet', parse_bibinet, session, clean_q),
+                'Ozon': _pw_limited('Ozon', parse_ozon, session, clean_q),
+                'Megazip': _pw_limited('Megazip', parse_megazip, session, clean_q),
             }
 
         all_tasks = {**http_tasks, **pw_tasks}
